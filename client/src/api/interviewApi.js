@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api/interviews`;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE = `${BASE_URL}/api/interviews`;
 
 export const startInterviewApi = (domain, difficulty) => {
   return axios.post(`${API_BASE}/start`, {
