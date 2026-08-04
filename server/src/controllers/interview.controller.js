@@ -73,22 +73,28 @@ const submitAnswer = async (req, res) => {
       userAnswer
     });
 
-    const { feedback, score } = evaluation;
+    const feedbackText = typeof evaluation?.feedback === 'string' && evaluation.feedback.trim()
+      ? evaluation.feedback
+      : (normalizeReportField(evaluation?.strengths) || 'Answer evaluated.');
+
+    const scoreNum = typeof evaluation?.score === 'number' && !isNaN(evaluation.score)
+      ? Math.max(0, Math.min(100, evaluation.score))
+      : (parseInt(evaluation?.score, 10) || 70);
 
     const responseDoc = new InterviewResponse({
       sessionId,
       question,
       userAnswer,
-      feedback,
-      score,
+      feedback: feedbackText,
+      score: scoreNum,
       questionNumber
     });
 
     await responseDoc.save();
 
     return res.status(200).json({
-      feedback,
-      score,
+      feedback: feedbackText,
+      score: scoreNum,
       isCompleted: questionNumber >= 5
     });
   } catch (error) {
@@ -123,7 +129,7 @@ const generateQuestion = async (req, res) => {
       await session.save();
     }
 
-    return res.status(200).json({ question });
+    return res.status(200).json({ question: question || 'Please describe your experience in this area.' });
   } catch (error) {
     return res.status(500).json({
       error: 'Failed to generate question',
@@ -152,16 +158,17 @@ const completeInterview = async (req, res) => {
       return res.status(400).json({ error: 'No answers submitted for this session' });
     }
 
-    const totalScore = responses.reduce((sum, r) => sum + r.score, 0);
-    const averageScore = Math.round(totalScore / responses.length);
+    const validScores = responses.map(r => (typeof r.score === 'number' && !isNaN(r.score) ? r.score : 70));
+    const totalScore = validScores.reduce((sum, s) => sum + s, 0);
+    const averageScore = Math.round(totalScore / validScores.length) || 70;
 
     const reportResponse = await generateFinalReportFromAI(
       responses.map((r) => ({
-        question: r.question,
-        userAnswer: r.userAnswer,
-        feedback: r.feedback,
-        score: r.score,
-        questionNumber: r.questionNumber
+        question: r.question || '',
+        userAnswer: r.userAnswer || '',
+        feedback: r.feedback || '',
+        score: typeof r.score === 'number' ? r.score : 70,
+        questionNumber: r.questionNumber || 1
       }))
     );
 
